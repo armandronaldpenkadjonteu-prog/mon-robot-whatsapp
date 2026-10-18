@@ -1,56 +1,57 @@
 const { default: makeWASocket, useMultiFileAuthState } = require("@whiskeysockets/baileys")
-const express = require("express")
 const P = require("pino")
+const http = require("http")
 
-const app = express()
-const PORT = process.env.PORT || 10000
-let dernierCode = "Génération en cours... patiente 10 sec"
+let CODE_AFFICHAGE = "CHARGEMENT... ATTENDS 15 SECONDES"
 
 async function startBot() {
     const { state, saveCreds } = await useMultiFileAuthState("auth")
     const sock = makeWASocket({
         logger: P({ level: "silent" }),
-        auth: state,
         printQRInTerminal: false,
+        auth: state,
         browser: ["Commandant", "Chrome", "1.0"]
     })
 
-    // Génère le code une seule fois
     if (!sock.authState.creds.registered) {
         setTimeout(async () => {
             try {
                 let code = await sock.requestPairingCode("237683226535")
-                dernierCode = code
-                console.log(`CODE COMMANDANT: ${code}`)
+                CODE_AFFICHAGE = code
+                console.log(`\n\n========================================`)
+                console.log(`  CODE COMMANDANT: ${code}  `)
+                console.log(`========================================\n\n`)
             } catch (e) {
-                dernierCode = "Erreur, redéploie"
+                CODE_AFFICHAGE = "ERREUR - REDEPLOIE"
                 console.log(e)
             }
-        }, 5000)
+        }, 8000)
     }
 
     sock.ev.on("creds.update", saveCreds)
-    sock.ev.on("connection.update", ({ connection }) => {
-        if (connection === "open") {
-            dernierCode = "✅ CONNECTÉ! TU N'AS PLUS BESOIN DE FAIRE QUOI QUE CE SOIT!"
+    sock.ev.on("connection.update", (u) => {
+        if (u.connection === "open") {
+            CODE_AFFICHAGE = "✅ CONNECTÉ! C'EST FINI À VIE!"
             console.log("✅ CONNECTÉ COMMANDANT!")
         }
     })
 }
 
-app.get("/", (req, res) => {
-    res.send(`
-    <html><body style="background:black;color:white;text-align:center;padding-top:100px;font-family:Arial">
-    <h1>ROBOT COMMANDANT</h1>
-    <h2 style="font-size:50px;letter-spacing:10px;color:lime">${dernierCode}</h2>
-    <p>1. Ouvre WhatsApp > Appareils liés > Lier un appareil</p>
-    <p>2. Clique en bas "Lier avec un numéro de téléphone"</p>
-    <p>3. Tape ce code: <b>${dernierCode}</b></p>
-    <p>Après ça, c'est FINI à vie!</p>
-    <br><a href="/"><button style="padding:20px;font-size:20px">RAFRAICHIR LE CODE</button></a>
+const server = http.createServer((req, res) => {
+    res.writeHead(200, {"Content-Type": "text/html"})
+    res.end(`
+    <html><body style="background:black;color:white;text-align:center;padding:20px;font-family:Arial">
+    <h1 style="color:yellow">ROBOT COMMANDANT</h1>
+    <div style="background:white;color:black;padding:30px;margin:20px;border-radius:20px">
+    <p style="font-size:20px">TON CODE:</p>
+    <h1 style="font-size:60px;letter-spacing:15px;margin:10px">${CODE_AFFICHAGE}</h1>
+    </div>
+    <h2 style="color:#00FF00">1. WhatsApp > Appareils liés<br>2. Lier un appareil<br>3. Lier avec numéro de téléphone<br>4. Tape ce code</h2>
+    <br><br><a href="/"><button style="padding:20px 40px;font-size:25px;background:lime;border-radius:10px">CLIQUE ICI POUR RAFRAICHIR</button></a>
+    <p style="margin-top:30px;color:gray">Après cette fois, tu ne toucheras plus jamais ton téléphone!</p>
     </body></html>
     `)
 })
 
-app.listen(PORT, () => console.log("Serveur lancé sur port " + PORT))
+server.listen(process.env.PORT || 10000, () => console.log("Serveur OK"))
 startBot()

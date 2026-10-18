@@ -5,10 +5,9 @@ const fs = require("fs");
 const app = express();
 const PORT = process.env.PORT || 10000;
 
-let pairingCode = "⏳ Attente... 30s";
+let pairingCode = "⏳ Chargement du code...";
 let isConnected = false;
 
-// Supprime l'ancienne session bloquée
 if (fs.existsSync("./auth")) {
     try { fs.rmSync("./auth", { recursive: true, force: true }); } catch(e){}
 }
@@ -21,24 +20,19 @@ async function startBot() {
         browser: ["ANIT-X-FINAL", "Chrome", "120.0"],
         printQRInTerminal: false
     });
-
     sock.ev.on("creds.update", saveCreds);
 
-    // Génère un nouveau code toutes les 60 secondes si pas connecté
     async function genCode() {
         if (isConnected) return;
         if (!sock.authState.creds.registered) {
             try {
                 pairingCode = await sock.requestPairingCode("237683226535");
-                console.log("🔥 CODE SÛR:", pairingCode);
+                console.log("CODE:", pairingCode);
             } catch (e) {
-                console.log("Erreur gen code:", e.message);
-                pairingCode = "❌ Bloqué 10min, attends...";
-                setTimeout(genCode, 60000);
+                pairingCode = "Attends 2min puis rafraichis";
             }
         }
     }
-
     setTimeout(genCode, 5000);
     setInterval(genCode, 65000);
 
@@ -46,8 +40,7 @@ async function startBot() {
         const { connection, lastDisconnect } = u;
         if (connection === "open") {
             isConnected = true;
-            pairingCode = "✅ CONNECTÉ À VIE! TU PEUX FERMER";
-            console.log("CONNECTÉ!");
+            pairingCode = "✅ CONNECTÉ!";
         }
         if (connection === "close") {
             const shouldReconnect = lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut;
@@ -62,20 +55,6 @@ async function startBot() {
 }
 
 app.get("/", (req, res) => {
-    res.send(`
-    <html><head><meta http-equiv="refresh" content="20"></head>
-    <body style="margin:0;background:#000;color:#00ff00;font-family:monospace;display:flex;justify-content:center;align-items:center;height:100vh">
-    <div style="border:4px solid #00ff00;padding:40px;border-radius:30px;text-align:center;box-shadow:0 0 30px #00ff00">
-    <h2 style="letter-spacing:3px">ANIT-X CODE SÛR</h2>
-    <h1 style="font-size:70px;margin:20px 0;letter-spacing:15px;color:white;background:#00ff00;color:black;padding:20px;border-radius:15px">${pairingCode}</h1>
-    <p style="font-size:18px">${isConnected ? "C'EST FAIT COMMANDANT! FERME CETTE PAGE!" : "WhatsApp > Paramètres > Appareils liés > Lier un appareil > Lier avec numéro<br>Entre ce code en 30 secondes"}</p>
-    <button onclick="location.reload()" style="margin-top:20px;padding:15px 30px;background:white;color:black;font-weight:bold;border:none;border-radius:10px;font-size:18px">RAFRAICHIR LE CODE</button>
-    <p style="margin-top:15px;font-size:12px;opacity:0.7">Le code change seul toutes les 60s</p>
-    </div></body></html>
-    `);
+    res.send(`<html><body style="margin:0;background:#000;color:#0f0;font-family:monospace;display:flex;justify-content:center;align-items:center;height:100vh"><div style="border:3px solid #0f0;padding:40px;border-radius:20px;text-align:center"><h2>ANIT-X CODE SÛR</h2><h1 style="font-size:60px;background:#0f0;color:#000;padding:20px;border-radius:10px">${pairingCode}</h1><p>WhatsApp > Appareils liés > Lier avec numéro</p><button onclick="location.reload()" style="padding:10px 20px">RAFRAICHIR</button></div></body></html>`);
 });
-
-app.listen(PORT, () => {
-    console.log("Serveur lancé sur", PORT);
-    startBot();
-});
+app.listen(PORT, () => { console.log("Lancé", PORT); startBot(); });

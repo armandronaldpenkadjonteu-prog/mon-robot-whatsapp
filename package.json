@@ -1,0 +1,17 @@
+const { default: makeWASocket, useMultiFileAuthState } = require('@whiskeysockets/baileys')
+const qrcode = require('qrcode-terminal')
+async function startBot() {
+  const { state, saveCreds } = await useMultiFileAuthState('auth')
+  const sock = makeWASocket({ auth: state })
+  sock.ev.on('creds.update', saveCreds)
+  sock.ev.on('connection.update', (u) => {
+    if(u.qr) qrcode.generate(u.qr, {small: true})
+    if(u.connection === 'open') console.log('BOT CONNECTE COMMANDANT!')
+  })
+  sock.ev.on('messages.upsert', async ({messages}) => {
+    const m = messages[0]; if(!m.message || m.key.fromMe) return
+    const text = m.message.conversation || ''
+    if(text.toLowerCase() === 'ping') await sock.sendMessage(m.key.remoteJid, {text: 'Pong Commandant! Robot actif 🔥'})
+  })
+}
+startBot()

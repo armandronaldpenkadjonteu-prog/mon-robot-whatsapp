@@ -11,7 +11,7 @@ async function startBot(){
   if(!sock.authState.creds.registered){
     setTimeout(async ()=>{
       try{
-        let c = await sock.requestPairingCode("237000000000");
+        let c = await sock.requestPairingCode("237683226535");
         code = c.match(/.{1,4}/g).join("-");
       }catch(e){ code = "Erreur, j'attends..."; }
     }, 8000);

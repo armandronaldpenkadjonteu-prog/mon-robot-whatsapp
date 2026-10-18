@@ -1,42 +1,56 @@
-const MON_NUMERO = "237683226535";
+const { default: makeWASocket, useMultiFileAuthState } = require("@whiskeysockets/baileys")
+const express = require("express")
+const P = require("pino")
 
-const http = require('http');
-http.createServer((req, res) => {
-  res.writeHead(200);
-  res.end('Bot en ligne Commandant!');
-}).listen(process.env.PORT || 10000, () => console.log('Serveur web allume'));
-
-const { default: makeWASocket, useMultiFileAuthState, DisconnectReason } = require('@whiskeysockets/baileys');
+const app = express()
+const PORT = process.env.PORT || 10000
+let dernierCode = "Génération en cours... patiente 10 sec"
 
 async function startBot() {
-  const { state, saveCreds } = await useMultiFileAuthState('auth_info_baileys');
-  const sock = makeWASocket({ auth: state, printQRInTerminal: false, browser: ["Bot Commandant","Chrome","1.0"] });
-  sock.ev.on('creds.update', saveCreds);
+    const { state, saveCreds } = await useMultiFileAuthState("auth")
+    const sock = makeWASocket({
+        logger: P({ level: "silent" }),
+        auth: state,
+        printQRInTerminal: false,
+        browser: ["Commandant", "Chrome", "1.0"]
+    })
 
-  if (!sock.authState.creds.registered) {
-    setTimeout(async () => {
-      try {
-        const code = await sock.requestPairingCode(MON_NUMERO);
-        console.log(`\n\n`);
-        console.log(`################################`);
-        console.log(`CODE COMMANDANT: ${code}`);
-        console.log(`################################`);
-        console.log(`\nVa sur WhatsApp > Appareils lies > Lier avec numero > Entre: ${code}\n\n`);
-      } catch(e) {
-        console.log("Erreur:", e.message);
-      }
-    }, 4000);
-  }
+    // Génère le code une seule fois
+    if (!sock.authState.creds.registered) {
+        setTimeout(async () => {
+            try {
+                let code = await sock.requestPairingCode("237683226535")
+                dernierCode = code
+                console.log(`CODE COMMANDANT: ${code}`)
+            } catch (e) {
+                dernierCode = "Erreur, redéploie"
+                console.log(e)
+            }
+        }, 5000)
+    }
 
-  sock.ev.on('connection.update', (u) => {
-    if (u.connection === 'open') console.log('BOT CONNECTE COMMANDANT!');
-    if (u.connection === 'close' && u.lastDisconnect?.error?.output?.statusCode !== DisconnectReason.loggedOut) startBot();
-  });
-
-  sock.ev.on('messages.upsert', async ({ messages }) => {
-    const m = messages[0]; if (!m.message) return;
-    const t = m.message.conversation || m.message.extendedTextMessage?.text || '';
-    if (t.toLowerCase() === '.ping') await sock.sendMessage(m.key.remoteJid, { text: 'Pong! Bot en ligne Commandant 683226535!' });
-  });
+    sock.ev.on("creds.update", saveCreds)
+    sock.ev.on("connection.update", ({ connection }) => {
+        if (connection === "open") {
+            dernierCode = "✅ CONNECTÉ! TU N'AS PLUS BESOIN DE FAIRE QUOI QUE CE SOIT!"
+            console.log("✅ CONNECTÉ COMMANDANT!")
+        }
+    })
 }
-startBot();
+
+app.get("/", (req, res) => {
+    res.send(`
+    <html><body style="background:black;color:white;text-align:center;padding-top:100px;font-family:Arial">
+    <h1>ROBOT COMMANDANT</h1>
+    <h2 style="font-size:50px;letter-spacing:10px;color:lime">${dernierCode}</h2>
+    <p>1. Ouvre WhatsApp > Appareils liés > Lier un appareil</p>
+    <p>2. Clique en bas "Lier avec un numéro de téléphone"</p>
+    <p>3. Tape ce code: <b>${dernierCode}</b></p>
+    <p>Après ça, c'est FINI à vie!</p>
+    <br><a href="/"><button style="padding:20px;font-size:20px">RAFRAICHIR LE CODE</button></a>
+    </body></html>
+    `)
+})
+
+app.listen(PORT, () => console.log("Serveur lancé sur port " + PORT))
+startBot()
